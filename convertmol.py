@@ -1,63 +1,64 @@
-import json
-from concept_formation.continuous_value import ContinuousValue
 from pprint import pprint
+import simplejson as json
+import os
 
 radical_dict = {
-    0:"no_radical",
-    1:"singlet",
-    2:"doublet",
-    3:"triplet"
+    0: "no_radical",
+    1: "singlet",
+    2: "doublet",
+    3: "triplet"
 }
 
 charge_dict = {
-    0:"outside_limits",
-    1:"+3",
-    2:"+2",
-    3:"+1",
-    4:"doublet_radical",
-    5:"-1",
-    6:"-2",
-    7:"-3"
+    0: "outside_limits",
+    1: "+3",
+    2: "+2",
+    3: "+1",
+    4: "doublet_radical",
+    5: "-1",
+    6: "-2",
+    7: "-3"
 }
 
 stereo_parity_dict = {
-    0:"not_stereo",
-    1:"odd",
-    2:"even",
-    3:"unmarked"
+    0: "not_stereo",
+    1: "odd",
+    2: "even",
+    3: "unmarked"
 }
 
 h_count_dict = {
-    0:"H0",
-    1:"H0",
-    2:"H1",
-    3:"H2",
-    4:"H3",
-    5:"H4"
+    0: "H0",
+    1: "H0",
+    2: "H1",
+    3: "H2",
+    4: "H3",
+    5: "H4"
 }
 
 bond_type_dict = {
-    1:"Single",
-    2:"Double",
-    3:"Triple",
-    4:"Aromatic",
-    5:"Single_or_Double",
-    6:"Single_or_Aromatic",
-    7:"Double_or_Aromatic",
-    8:"Any"
+    1: "Single",
+    2: "Double",
+    3: "Triple",
+    4: "Aromatic",
+    5: "Single_or_Double",
+    6: "Single_or_Aromatic",
+    7: "Double_or_Aromatic",
+    8: "Any"
 }
 
 single_bond_stereo_dict = {
-    0:"Not_stereo",
-    1:"Up",
-    4:"Either",
-    6:"Down"
+    0: "Not_stereo",
+    1: "Up",
+    4: "Either",
+    6: "Down"
 }
 
 double_bond_stereo_dict = {
-    0:"Use_coordinates",
-    3:"Cis_or_trans"
+    0: "Use_coordinates",
+    3: "Cis_or_trans"
 }
+
 
 def parse_counts_line(line):
     """
@@ -87,6 +88,7 @@ def parse_counts_line(line):
     ret["vvvvv"] = line[-5:]
     return ret
 
+
 def parse_atom_line(line):
     """
     Parses a line from the atom block and returns it as a dictionary
@@ -114,7 +116,7 @@ def parse_atom_line(line):
     ret["yyy"] = float(line[10:20])
     ret["zzz"] = float(line[20:30])
     ret["aaa"] = line[31:34].strip()
-    ret["dd"] =  int(float(line[34:36]))
+    ret["dd"] = int(float(line[34:36]))
     ret["ccc"] = int(float(line[36:39]))
     ret["sss"] = int(float(line[39:42]))
     ret["hhh"] = int(float(line[42:45]))
@@ -125,6 +127,7 @@ def parse_atom_line(line):
     ret["nnn"] = int(float(line[63:66]))
     ret["eee"] = int(float(line[66:69]))
     return ret
+
 
 def parse_bond_line(line):
     """
@@ -149,15 +152,17 @@ def parse_bond_line(line):
     ret["ccc"] = int(float(line[18:21]))
     return ret
 
+
 def parse_data_name(line):
     """
     Parses the name of a data item line, which will be used as an attribute name
     """
-    first = line.index("<")+1
+    first = line.index("<") + 1
     last = line.rindex(">")
     return line[first:last]
 
-def apply_m_chg(line,mol):
+
+def apply_m_chg(line, mol):
     """
     Parses a CHG line from the property block.
 
@@ -170,19 +175,20 @@ def apply_m_chg(line,mol):
     if len(line) == 0:
         return mol
     for k in mol:
-        if isinstance(k,str) and k.startswith('?atom'):
+        if isinstance(k, str) and k.startswith('?atom'):
             mol[k]["charge"] = "0"
     line = line.rsplit(r'\s+')[3:]
-    for i in range(0,len(line),2):
+    for i in range(0, len(line), 2):
         aaa = int(line[i])
-        vvv = line[i+1]
+        vvv = line[i + 1]
         if vvv[0] == "-":
-            mol["?atom%04d"%aaa]["charge"] = vvv    
+            mol["?atom%04d" % aaa]["charge"] = vvv
         else:
-            mol["?atom%04d"%aaa]["charge"] = "+"+vvv
+            mol["?atom%04d" % aaa]["charge"] = "+" + vvv
     return mol
 
-def apply_m_rad(line,mol):
+
+def apply_m_rad(line, mol):
     """
     Parses a RAD line from the property block
 
@@ -193,18 +199,19 @@ def apply_m_rad(line,mol):
     if len(line) == 0:
         return mol
     for k in mol:
-        if isinstance(k,str) and k.startswith('?atom'):
+        if isinstance(k, str) and k.startswith('?atom'):
             mol[k]["charge"] = "0"
             mol[k]["radical"] = "no radical"
 
     line = line.rsplit(r'\s+')[3:]
-    for i in range(0,len(line),2):
+    for i in range(0, len(line), 2):
         aaa = int(line[i])
-        vvv = int(line[i+1])
-        mol["?atom%04d"%aaa]["radical"] = radical_dict[vvv]
+        vvv = int(line[i + 1])
+        mol["?atom%04d" % aaa]["radical"] = radical_dict[vvv]
     return mol
 
-def apply_m_iso(line,mol):
+
+def apply_m_iso(line, mol):
     """
     Parses and applies an ISO line from the property block
 
@@ -215,15 +222,16 @@ def apply_m_iso(line,mol):
     if len(line) == 0:
         return mol
     for k in mol:
-        if isinstance(k,str) and k.startswith('?atom'):
+        if isinstance(k, str) and k.startswith('?atom'):
             mol[k]["mass_diff"] = "0"
 
     line = line.rsplit(r'\s+')[3:]
-    for i in range(0,len(line),2):
+    for i in range(0, len(line), 2):
         aaa = int(line[i])
-        vvv = int(line[i]+1)
-        mol["?atom%04d"%aaa]["mass_diff"] = "+"+radical_dict[vvv]
+        vvv = int(line[i] + 1)
+        mol["?atom%04d" % aaa]["mass_diff"] = "+" + radical_dict[vvv]
     return mol
+
 
 def merge_m_lines(lines):
     if len(lines) == 0:
@@ -233,7 +241,8 @@ def merge_m_lines(lines):
         line0 += l[8:]
     return line0
 
-def parse_mol(lines, verbose = False, data_items=False, tuple_realtions=False):
+
+def parse_mol(lines, verbose=False, data_items=False, tuple_realtions=False):
     """
     Parse the provided molfile and return a structured object representation
     that can be read by TRESTLE.
@@ -255,7 +264,7 @@ def parse_mol(lines, verbose = False, data_items=False, tuple_realtions=False):
     num_lists = c_line["lll"]
 
     atom_dex = 4 + num_atoms
-    bond_dex = atom_dex + num_bonds 
+    bond_dex = atom_dex + num_bonds
 
     if verbose:
         if c_line["ccc"] == 1:
@@ -266,7 +275,7 @@ def parse_mol(lines, verbose = False, data_items=False, tuple_realtions=False):
     mol["version"] = c_line["vvvvv"]
 
     ### ATOM BLOCK ###
-    for l,line in enumerate(lines[4:atom_dex]):
+    for l, line in enumerate(lines[4:atom_dex]):
         atom = {}
         a_line = parse_atom_line(line)
         atom["x"] = a_line["xxx"]
@@ -274,7 +283,7 @@ def parse_mol(lines, verbose = False, data_items=False, tuple_realtions=False):
         atom["z"] = a_line["zzz"]
 
         atom["symbol"] = a_line["aaa"]
-        #stringify mass difference or leave numeric?
+        # stringify mass difference or leave numeric?
         atom["mass_diff"] = str(a_line["dd"])
         atom["charge"] = charge_dict[a_line["ccc"]]
         atom["stereo_parity"] = stereo_parity_dict[a_line["sss"]]
@@ -289,11 +298,10 @@ def parse_mol(lines, verbose = False, data_items=False, tuple_realtions=False):
         if verbose:
             atom["hydrogen_count"] = h_count_dict[a_line["hhh"]]
 
-
-        mol["?atom%04d"%(l+1)] = atom
+        mol["?atom%04d" % (l + 1)] = atom
 
     ### BOND BLOCK ###
-    for l,line in enumerate(lines[atom_dex:bond_dex]):
+    for l, line in enumerate(lines[atom_dex:bond_dex]):
         bond = ['bond']
         b_line = parse_bond_line(line)
 
@@ -302,13 +310,13 @@ def parse_mol(lines, verbose = False, data_items=False, tuple_realtions=False):
             bond.append(single_bond_stereo_dict[b_line["sss"]])
         elif bond_type_dict[b_line["ttt"]] == "Double":
             bond.append(double_bond_stereo_dict[b_line["sss"]])
-        bond.append("?atom%04d"%b_line["111"])
-        bond.append("?atom%04d"%b_line["222"])
+        bond.append("?atom%04d" % b_line["111"])
+        bond.append("?atom%04d" % b_line["222"])
 
         if tuple_realtions:
             mol[tuple(bond)] = True
         else:
-            mol['('+' '.join(bond)+')'] = True
+            mol['(' + ' '.join(bond) + ')'] = True
 
     ### PROPERTIES BLOCK ###
 
@@ -320,11 +328,11 @@ def parse_mol(lines, verbose = False, data_items=False, tuple_realtions=False):
             Ms.append(line)
         else:
             break
-    
+
     if len(Ms) > 0:
-        apply_m_chg(merge_m_lines([l for l in Ms if l.startswith('M  CHG')]),mol)
-        apply_m_rad(merge_m_lines([l for l in Ms if l.startswith('M  RAD')]),mol)
-        apply_m_iso(merge_m_lines([l for l in Ms if l.startswith('M  ISO')]),mol)
+        apply_m_chg(merge_m_lines([l for l in Ms if l.startswith('M  CHG')]), mol)
+        apply_m_rad(merge_m_lines([l for l in Ms if l.startswith('M  RAD')]), mol)
+        apply_m_iso(merge_m_lines([l for l in Ms if l.startswith('M  ISO')]), mol)
 
     ### DATA ITEMS ###
     if data_items:
@@ -347,25 +355,85 @@ def parse_mol(lines, verbose = False, data_items=False, tuple_realtions=False):
 
     return mol
 
-def parse_sdf_file(filename,verbose = False,data_items=False,tuple_realtions=False,n=-1):
+
+def mol_to_json(lines, data_items=False, as_json=False):
+    mol = {}
+    structure = lines[0:3]
+
+    ### COUNTS LINE ###
+    c_line = parse_counts_line(lines[3])
+    num_atoms = c_line["aaa"]
+    num_bonds = c_line["bbb"]
+
+    atom_dex = 4 + num_atoms
+    bond_dex = atom_dex + num_bonds
+
+    ### ATOM BLOCK ###
+    for line in lines[4:bond_dex]:
+        structure.append(line.strip())
+
+    ### PROPERTIES BLOCK ###
+    for line in lines[bond_dex:]:
+        if line == 'M  END':
+            structure.append(line.strip())
+            break
+        if line[0] == "M":
+            structure.append(line.strip())
+        else:
+            break
+    mol['STRUCTURE'] = '\n'.join(structure)
+
+    ### DATA ITEMS ###
+    if data_items:
+        data_dex = len(structure)
+        opened = False
+        data_header = ""
+        data_list = []
+        for line in lines[data_dex:]:
+            if line:
+                if not opened and line[0] == ">":
+                    opened = True
+                    data_header = parse_data_name(line)
+                    data_list = []
+                    continue
+                elif opened:
+                    data_list.append(line)
+            elif opened:
+                mol[data_header] = '\n'.join(data_list)
+                opened = False
+
+    if as_json:
+        return json.dumps(mol, use_decimal=True)
+    else:
+        return mol
+
+
+def parse_sdf_file(filename, data_items=False, as_json=False, n=-1):
     ret = []
     curr = []
     count = 0
-    with open(filename,"r") as molefile:
-        for line in molefile:
-            line = line.rstrip('\r\n')
-            if not line == "$$$$":
-                curr.append(line)
-            else:
-                if len(curr) > 0:
-                    ret.append(parse_mol(curr,verbose,data_items,tuple_realtions))    
-                    count += 1
-                    if n > 0 and count > n:
-                        break
-                curr = []
+
+    file, ext = os.path.splitext(filename)
+
+
+
+    with open(filename, "r") as molefile:
+        with open(f'{file}.json', "w") as jsonfile:
+            for line in molefile:
+                line = line.rstrip('\r\n')
+                if not line == "$$$$":
+                    curr.append(line)
+                else:
+                    if len(curr) > 0:
+                        # ret.append(mol_to_json(curr, data_items, as_json))
+                        jsonfile.write(mol_to_json(curr, data_items, as_json) + '\n')
+                        count += 1
+                        if 0 < n < count:
+                            break
+                    curr = []
     return ret
 
+
 if __name__ == '__main__':
-    # mols = parse_sdf_file("./example.mol",True,True,True,n=100)
-    mols = parse_sdf_file("./testSDFs/Compound_000000001_000025000.sdf",True,True,True,n=25000)
-    pprint(mols[0])
+
+    parse_sdf_file("./testSDFs/Compound_000000001_000500000.sdf", True, False, n=100)
