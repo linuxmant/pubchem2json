@@ -2,8 +2,6 @@ import glob
 import multiprocessing
 import threading
 from multiprocessing.pool import Pool
-from pprint import pprint
-import os
 import gzip
 import simplejson as json
 
@@ -83,14 +81,9 @@ def parse_counts_line(line):
     mmm = number of lines of additional properties,
     vvvvv = version for the format
     """
-    ret = {}
-    ret["aaa"] = int(float(line[0:3]))
-    ret["bbb"] = int(float(line[3:6]))
-    ret["lll"] = int(float(line[6:9]))
-    ret["ccc"] = int(float(line[12:15]))
-    ret["sss"] = int(float(line[15:18]))
-    ret["mmm"] = int(float(line[18:21]))
-    ret["vvvvv"] = line[-5:]
+    ret = {"aaa": int(float(line[0:3])), "bbb": int(float(line[3:6])), "lll": int(float(line[6:9])),
+           "ccc": int(float(line[12:15])), "sss": int(float(line[15:18])), "mmm": int(float(line[18:21])),
+           "vvvvv": line[-5:]}
     return ret
 
 
@@ -116,21 +109,11 @@ def parse_atom_line(line):
     [63:66] nnn = IGNORED inversion/retention flag g 0 = property not applied 1 = configuration is inverted,2 = configuration is retained
     [66:69] eee = IGNORED 0 = property not applied, 1 = change on atom must be exactly as shown
     """
-    ret = {}
-    ret["xxx"] = float(line[0:10])
-    ret["yyy"] = float(line[10:20])
-    ret["zzz"] = float(line[20:30])
-    ret["aaa"] = line[31:34].strip()
-    ret["dd"] = int(float(line[34:36]))
-    ret["ccc"] = int(float(line[36:39]))
-    ret["sss"] = int(float(line[39:42]))
-    ret["hhh"] = int(float(line[42:45]))
-    ret["bbb"] = int(float(line[45:48]))
-    ret["vvv"] = int(float(line[48:51]))
-    ret["HHH"] = int(float(line[51:54]))
-    ret["mmm"] = int(float(line[60:63]))
-    ret["nnn"] = int(float(line[63:66]))
-    ret["eee"] = int(float(line[66:69]))
+    ret = {"xxx": float(line[0:10]), "yyy": float(line[10:20]), "zzz": float(line[20:30]), "aaa": line[31:34].strip(),
+           "dd": int(float(line[34:36])), "ccc": int(float(line[36:39])), "sss": int(float(line[39:42])),
+           "hhh": int(float(line[42:45])), "bbb": int(float(line[45:48])), "vvv": int(float(line[48:51])),
+           "HHH": int(float(line[51:54])), "mmm": int(float(line[60:63])), "nnn": int(float(line[63:66])),
+           "eee": int(float(line[66:69]))}
     return ret
 
 
@@ -147,14 +130,9 @@ def parse_bond_line(line):
     rrr = bond topology
     ccc = reacting center status
     """
-    ret = {}
-    ret["111"] = int(float(line[0:3]))
-    ret["222"] = int(float(line[3:6]))
-    ret["ttt"] = int(float(line[6:9]))
-    ret["sss"] = int(float(line[9:12]))
-    ret["xxx"] = int(float(line[12:15]))
-    ret["rrr"] = int(float(line[15:18]))
-    ret["ccc"] = int(float(line[18:21]))
+    ret = {"111": int(float(line[0:3])), "222": int(float(line[3:6])), "ttt": int(float(line[6:9])),
+           "sss": int(float(line[9:12])), "xxx": int(float(line[12:15])), "rrr": int(float(line[15:18])),
+           "ccc": int(float(line[18:21]))}
     return ret
 
 
@@ -252,13 +230,8 @@ def parse_mol(lines, verbose=False, data_items=False, tuple_realtions=False):
     Parse the provided molfile and return a structured object representation
     that can be read by TRESTLE.
     """
-    mol = {}
-    num_atoms = 0
-    num_bonds = 0
-    num_lists = 0
+    mol = {"name": lines[0], "software": lines[1].strip()}
 
-    mol["name"] = lines[0]
-    mol["software"] = lines[1].strip()
     if lines[2]:
         mol["comment"] = lines[2].strip()
 
@@ -295,7 +268,7 @@ def parse_mol(lines, verbose=False, data_items=False, tuple_realtions=False):
 
         if a_line["vvv"] == 0:
             atom["valence"] = "no marking"
-        if a_line["vvv"] > 0 and a_line["vvv"] < 15:
+        if 0 < a_line["vvv"] < 15:
             atom["valence"] = str(a_line["vvv"])
         if a_line["vvv"] == 15:
             atom["valence"] = "zero valence"
@@ -444,7 +417,7 @@ def parse_sdf_file(filename, data_items=True, as_json=True, n=-1):
 
 
 if __name__ == '__main__':
-    files = glob.glob('./testSDFs/*.sdf.gz', recursive=False)
+    files = glob.glob('/h/pubchem/compounds/*.sdf.gz', recursive=False)
     threads = int(multiprocessing.cpu_count() / 2) if int(multiprocessing.cpu_count() / 2) >= 1 else 1
     print(f'Using {threads} cores...')
 
