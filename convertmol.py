@@ -1,6 +1,11 @@
+import glob
+import multiprocessing
+import threading
+from multiprocessing.pool import Pool
 from pprint import pprint
-import simplejson as json
 import os
+import gzip
+import simplejson as json
 
 radical_dict = {
     0: "no_radical",
@@ -408,32 +413,40 @@ def mol_to_json(lines, data_items=False, as_json=False):
         return mol
 
 
-def parse_sdf_file(filename, data_items=False, as_json=False, n=-1):
-    ret = []
+def parse_sdf_file(filename, data_items=True, as_json=True, n=-1):
     curr = []
     count = 0
 
-    file, ext = os.path.splitext(filename)
+    outfile = filename.replace('.sdf.gz', '.json')
+    jsonfile = open(outfile, 'w')
+    jsonfile.write('[\n')
 
+    print(f'Converting {filename} (${threading.current_thread().name})')
+    with gzip.open(filename, 'r') as molefile:
+        for line in molefile:
+            line = line.decode('utf-8').rstrip('\r\n')
+            if not line == '$$$$':
+                curr.append(line)
+            else:
+                if len(curr) > 0:
+                    jstr = mol_to_json(curr, data_items, as_json)
+                    jsonfile.write(jstr + ',\n')
+                    count += 1
+                    if 0 < n < count:
+                        break
+                curr = []
 
-
-    with open(filename, "r") as molefile:
-        with open(f'{file}.json', "w") as jsonfile:
-            for line in molefile:
-                line = line.rstrip('\r\n')
-                if not line == "$$$$":
-                    curr.append(line)
-                else:
-                    if len(curr) > 0:
-                        # ret.append(mol_to_json(curr, data_items, as_json))
-                        jsonfile.write(mol_to_json(curr, data_items, as_json) + '\n')
-                        count += 1
-                        if 0 < n < count:
-                            break
-                    curr = []
-    return ret
+    jsonfile.write(']')
+    jsonfile.flush()
+    jsonfile.close()
+    print(f'Saved {outfile} (${threading.current_thread().name})')
+    return
 
 
 if __name__ == '__main__':
+    files = glob.glob('./testSDFs/*.sdf.gz', recursive=False)
+    threads = int(multiprocessing.cpu_count() / 2) if int(multiprocessing.cpu_count() / 2) >= 1 else 1
+    print(f'Using {threads} cores...')
 
-    parse_sdf_file("./testSDFs/Compound_000000001_000500000.sdf", True, False, n=100)
+    p = Pool(threads)
+    p.map(parse_sdf_file, files)
