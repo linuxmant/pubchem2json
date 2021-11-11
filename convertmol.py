@@ -392,7 +392,6 @@ def parse_sdf_file(filename, data_items=True, as_json=True, n=-1):
 
     outfile = filename.replace('.sdf.gz', '.json')
     jsonfile = open(outfile, 'w')
-    jsonfile.write('[\n')
 
     print(f'Converting {filename} (${threading.current_thread().name})')
     with gzip.open(filename, 'r') as molefile:
@@ -403,13 +402,12 @@ def parse_sdf_file(filename, data_items=True, as_json=True, n=-1):
             else:
                 if len(curr) > 0:
                     jstr = mol_to_json(curr, data_items, as_json)
-                    jsonfile.write(jstr + ',\n')
+                    jsonfile.write(jstr + '\n')
                     count += 1
                     if 0 < n < count:
                         break
                 curr = []
 
-    jsonfile.write(']')
     jsonfile.flush()
     jsonfile.close()
     print(f'Saved {outfile} (${threading.current_thread().name})')
@@ -418,7 +416,12 @@ def parse_sdf_file(filename, data_items=True, as_json=True, n=-1):
 
 if __name__ == '__main__':
     files = glob.glob('/h/pubchem/compounds/*.sdf.gz', recursive=False)
-    threads = int(multiprocessing.cpu_count() / 2) if int(multiprocessing.cpu_count() / 2) >= 1 else 1
+    # with open('/h/pubchem/comp-gz.txt', 'r') as fin:
+    #     files = fin.readlines()
+
+    files = [f.rstrip() for f in files]
+
+    threads = int(multiprocessing.cpu_count() - 3) if int(multiprocessing.cpu_count() - 3) >= 1 else 1
     print(f'Using {threads} cores...')
 
     p = Pool(threads)
