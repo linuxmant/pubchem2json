@@ -1,9 +1,9 @@
 import glob
-import multiprocessing
-import threading
-from multiprocessing.pool import Pool
 import gzip
+import threading
 import simplejson as json
+import multiprocessing as mp
+from multiprocessing.pool import Pool
 
 radical_dict = {
     0: "no_radical",
@@ -393,36 +393,46 @@ def parse_sdf_file(filename, data_items=True, as_json=True, n=-1):
     outfile = filename.replace('.sdf.gz', '.json')
     jsonfile = open(outfile, 'w')
 
-    print(f'Converting {filename} (${threading.current_thread().name})')
-    with gzip.open(filename, 'r') as molefile:
-        for line in molefile:
-            line = line.decode('utf-8').rstrip('\r\n')
-            if not line == '$$$$':
-                curr.append(line)
-            else:
-                if len(curr) > 0:
-                    jstr = mol_to_json(curr, data_items, as_json)
-                    jsonfile.write(jstr + '\n')
-                    count += 1
-                    if 0 < n < count:
-                        break
-                curr = []
+    pname = mp.current_process().name
 
-    jsonfile.flush()
-    jsonfile.close()
-    print(f'Saved {outfile} (${threading.current_thread().name})')
+    print(f'[{pname}] Converting {filename}')
+    try:
+        with gzip.open(filename, 'r') as molefile:
+            for line in molefile:
+                line = line.decode('utf-8').rstrip('\r\n')
+                if not line == '$$$$':
+                    curr.append(line)
+                else:
+                    if len(curr) > 0:
+                        jstr = mol_to_json(curr, data_items, as_json)
+                        jsonfile.write(jstr + '\n')
+                        count += 1
+                        if 0 < n < count:
+                            break
+                    curr = []
+
+        jsonfile.flush()
+        jsonfile.close()
+        with open('/h/pubchem/done_sub.txt', 'a') as fin:
+            fin.write(f'{outfile}\n')
+        print(f'Saved {outfile} (${threading.current_thread().name})')
+    except Exception as ex:
+        print(f'Error ({ex.args}) file: {filename}')
+        with open('/h/pubchem/error_sub.txt', 'a') as ferr:
+            ferr.write(f'{outfile}\n')
     return
 
 
 if __name__ == '__main__':
-    files = glob.glob('/h/pubchem/compounds/*.sdf.gz', recursive=False)
-    # with open('/h/pubchem/comp-gz.txt', 'r') as fin:
-    #     files = fin.readlines()
+    files = glob.glob('/h/pubchem/substances/*.sdf.gz', recursive=False)
+    with open('/h/pubchem/done_sub.txt', 'r') as fin:
+        skip = [f.strip() for f in fin.readlines()]
 
-    files = [f.rstrip() for f in files]
+    files = [f.strip() for f in files if f.strip() not in skip]
+    files.sort()
 
-    threads = int(multiprocessing.cpu_count() - 3) if int(multiprocessing.cpu_count() - 3) >= 1 else 1
+    threads = int(mp.cpu_count() - 3) if int(mp.cpu_count() - 3) >= 1 else 1
     print(f'Using {threads} cores...')
 
-    p = Pool(threads)
-    p.map(parse_sdf_file, files)
+    p = mp.get_context("spawn").Pool(threads)
+    p.map(parse_sdf_file, files, chunksize=1)
