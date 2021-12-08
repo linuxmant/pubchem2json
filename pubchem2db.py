@@ -56,10 +56,10 @@ def upload(filename):
         print(f'loading {filename}')
         for f in fin:
             j = json.loads(f.strip())
-            data.append({'id': j[id_label], 'file': fname, table['column']: f.strip()})
+            data.append({'id': j[id_label], 'file': fname, table['column']: j})
 
     print(f'grouping data in {filename}')
-    dd = [{'table': table['name'], 'values': data[i:i + 10]} for i in
+    dd = [{'table': table['name'], 'column': table['column'], 'values': data[i:i + 10]} for i in
           range(0, len(data), 10)]
 
     p2 = mp.get_context('spawn').Pool(5)
