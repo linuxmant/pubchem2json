@@ -1,6 +1,10 @@
+import argparse
 import glob
 import gzip
 import threading
+from itertools import repeat
+from pprint import pprint
+
 import simplejson as json
 import multiprocessing as mp
 from multiprocessing.pool import Pool
@@ -386,18 +390,19 @@ def mol_to_json(lines, data_items=False, as_json=False):
         return mol
 
 
-def parse_sdf_file(filename, data_items=True, as_json=True, n=-1):
+def parse_sdf_file(filename, params, n=-1, data_items=True, as_json=True):
     curr = []
     count = 0
+    inputfile = params['input'] + '/' + filename
+    outfile = params['output'] + '/' + filename.replace('.sdf.gz', '.json')
 
-    outfile = filename.replace('.sdf.gz', '.json')
     jsonfile = open(outfile, 'w')
 
     pname = mp.current_process().name
 
-    print(f'[{pname}] Converting {filename}')
+    print(f"[{pname}] Converting {inputfile}")
     try:
-        with gzip.open(filename, 'r') as molefile:
+        with gzip.open(inputfile, 'r') as molefile:
             for line in molefile:
                 line = line.decode('utf-8').rstrip('\r\n')
                 if not line == '$$$$':
@@ -413,26 +418,54 @@ def parse_sdf_file(filename, data_items=True, as_json=True, n=-1):
 
         jsonfile.flush()
         jsonfile.close()
-        with open('/h/pubchem/done_sub.txt', 'a') as fin:
-            fin.write(f'{outfile}\n')
+
+        with open(params['input'] + '/done_sub.txt', 'a') as fin:
+            fin.write(outfile + '\n')
         print(f'Saved {outfile} (${threading.current_thread().name})')
     except Exception as ex:
         print(f'Error ({ex.args}) file: {filename}')
-        with open('/h/pubchem/error_sub.txt', 'a') as ferr:
-            ferr.write(f'{outfile}\n')
+        with open(params['input'] + '/error_sub.txt', 'a') as ferr:
+            ferr.write(outfile + '\n')
     return
 
 
-if __name__ == '__main__':
-    files = glob.glob('/h/pubchem/substances/*.sdf.gz', recursive=False)
-    with open('/h/pubchem/done_sub.txt', 'r') as fin:
-        skip = [f.strip() for f in fin.readlines()]
+def main(params):
+    if params['t']:
+        last = 1
+    else:
+        last = -1
 
-    files = [f.strip() for f in files if f.strip() not in skip]
+    files = glob.glob(f"{params['input']}/*.sdf.gz", recursive=False)[:last]
+    with open(f"{params['input']}/done_sub.txt", 'r') as fin:
+        skip = [f.strip() for f in fin.readlines()]
+    skip.sort()
+
+    files = [f.split('/')[-1].strip() for f in files if f.strip() not in skip]
     files.sort()
 
     threads = int(mp.cpu_count() - 3) if int(mp.cpu_count() - 3) >= 1 else 1
     print(f'Using {threads} cores...')
 
     p = mp.get_context("spawn").Pool(threads)
-    p.map(parse_sdf_file, files, chunksize=1)
+    p.starmap(parse_sdf_file,
+              zip(files, repeat(params), repeat(last), repeat(True), repeat(True)),
+              chunksize=1)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Convert Pubchem .sdf.gz files to .json')
+    parser.add_argument('-i', '--input', help='Folder with .sdf.gz files', required=True)
+    parser.add_argument('-o', '--output', help='Folder to store .json files', required=True)
+    parser.add_argument('-t', action='store_true', help='Run in test mode.')
+
+    try:
+        args = parser.parse_args()
+        args.input = args.input.rstrip('/')
+        args.output = args.output.rstrip('/')
+        main(vars(args))
+    except TypeError as e:
+        pprint(e.__cause__)
+    except Exception as e:
+        pprint(e)
+    finally:
+        parser.print_help()

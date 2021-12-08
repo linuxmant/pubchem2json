@@ -1,7 +1,9 @@
 #!/usr/bin/python
+import argparse
 import sys
 import glob
 import multiprocessing as mp
+from itertools import repeat
 from pprint import pprint
 
 import simplejson as json
@@ -18,33 +20,32 @@ tables = {
 }
 
 
-def call_db(item):
+def call_db(items, table, column, filename):
     pname = mp.current_process().name
     with engine.connect() as conn:
-        insert_stmt = insert(tables[item['table']]).values(item['values'])
-        do_nothing = insert_stmt.on_conflict_do_nothing(constraint=f"{item['table']}_pk")
+        insert_stmt = insert(tables[table]).values(items)
+        do_nothing = insert_stmt.on_conflict_do_nothing(constraint=table + '_pk')
 
         try:
             with conn.begin():
                 r = conn.execute(do_nothing)
-                # print(pname, r.inserted_primary_key_rows)
         except OperationalError:
             try:
                 with conn.begin():
                     r = conn.execute(do_nothing)
-                    # print(pname, r.inserted_primary_key_rows, '(retry)')
             except OperationalError as ex:
-                with open('retry.sql', 'a') as retry:
-                    retry.write(f'[{pname}] {do_nothing} ({do_nothing.mappings})\n')
-                    retry.flush()
+                with open('error.txt', 'a') as error:
+                    error.write(filename + '\n')
+                    error.flush()
                 print(f'[{pname}]', ex)
 
 
-def upload(filename):
-    # pname = mp.current_process().name
-    fname = filename.split('/')[-1].strip()
+def upload_chemspider():
+    pass
 
-    if fname.lower().startswith('compound'):
+
+def upload_pubchem(filename, folder):
+    if filename.lower().startswith('compound'):
         id_label = 'PUBCHEM_COMPOUND_CID'
         table = {'name': 'pubchemc', 'column': 'compound'}
     else:
@@ -52,33 +53,49 @@ def upload(filename):
         table = {'name': 'pubchems', 'column': 'substance'}
 
     data = []
-    with open(filename, 'r') as fin:
-        print(f'loading {filename}')
+    with open(folder + '/' + filename, 'r') as fin:
+        print(f'loading {folder}/{filename}')
         for f in fin:
             j = json.loads(f.strip())
-            data.append({'id': j[id_label], 'file': fname, table['column']: j})
+            data.append({'id': j[id_label], 'file': filename, table['column']: j})
 
     print(f'grouping data in {filename}')
-    dd = [{'table': table['name'], 'column': table['column'], 'values': data[i:i + 10]} for i in
-          range(0, len(data), 10)]
+    dd = [data[i:i + 100] for i in range(0, len(data), 100)]
+    # dd = [{'table': table['name'], 'column': table['column'], 'values': data[i:i + 10]} for i in
+    #       range(0, len(data), 10)]
 
-    p2 = mp.get_context('spawn').Pool(5)
-    p2.map(call_db, dd, 1)
+    p2 = mp.get_context('spawn').Pool(10)
+    p2.map(call_db, zip(dd, table['name'], table['column'], repeat(f'{folder}/{filename}')), 1)
 
 
-def main(args):
-    last = -1
-    if '-t' in args:
+def main(params):
+    if params['t']:
         last = 1
+    else:
+        last = -1
 
-    files = glob.glob(f'{args[0]}*.json')
+    files = [f.split('/')[-1] for f in glob.glob(params['input'] + '/*.json')[:last]]
     files.sort()
 
-    # with mp.get_context('spawn').Pool(1) as p:
-    #     p.map(upload, files[:last], 1)
-    for f in files[:last]:
-        upload(f)
+    with open(params['input']+'/done_cmp_json.txt', 'r') as done:
+        skip = [s.strip() for s in done.readlines()]
+
+    filtered = [f for f in files if f not in skip]
+
+    for f in filtered:
+        upload_pubchem(f, params['input'])
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    parser = argparse.ArgumentParser(description='Upload Pubchem .json files to RDS')
+    parser.add_argument('-i', '--input', help='Folder with .json files', required=True)
+    parser.add_argument('-t', action='store_true', help='Run in test mode.')
+
+    try:
+        args = parser.parse_args()
+        args.input = args.input.rstrip('/')
+        main(vars(args))
+    except Exception as e:
+        pprint(e.__cause__)
+    finally:
+        parser.print_help()
