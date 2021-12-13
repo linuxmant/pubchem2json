@@ -396,12 +396,12 @@ def parse_sdf_file(filename, params, n=-1, data_items=True, as_json=True):
     inputfile = params['input'] + '/' + filename
     outfile = params['output'] + '/' + filename.replace('.sdf.gz', '.json')
 
-    jsonfile = open(outfile, 'w')
 
     pname = mp.current_process().name
 
     print(f"[{pname}] Converting {inputfile}")
     try:
+        jsonfile = open(outfile, 'w')
         with gzip.open(inputfile, 'r') as molefile:
             for line in molefile:
                 line = line.decode('utf-8').rstrip('\r\n')
@@ -419,12 +419,12 @@ def parse_sdf_file(filename, params, n=-1, data_items=True, as_json=True):
         jsonfile.flush()
         jsonfile.close()
 
-        with open(params['input'] + '/done_sub.txt', 'a') as fin:
+        with open(params['input'] + '/done.txt', 'a') as fin:
             fin.write(outfile + '\n')
         print(f'Saved {outfile} (${threading.current_thread().name})')
     except Exception as ex:
         print(f'Error ({ex.args}) file: {filename}')
-        with open(params['input'] + '/error_sub.txt', 'a') as ferr:
+        with open(params['input'] + '/error.txt', 'a') as ferr:
             ferr.write(outfile + '\n')
     return
 
@@ -436,7 +436,7 @@ def main(params):
         last = -1
 
     files = glob.glob(f"{params['input']}/*.sdf.gz", recursive=False)[:last]
-    with open(f"{params['input']}/done_sub.txt", 'r') as fin:
+    with open(f"{params['input']}/done.txt", 'r') as fin:
         skip = [f.strip() for f in fin.readlines()]
     skip.sort()
 
